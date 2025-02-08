@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <style>
+        /* Reset margin dan padding */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        /* Container utama untuk aplikasi */
+        .app-container {
+            display: flex;
+            height: 100vh; /* Mengisi seluruh tinggi layar */
+            width: 100vw; /* Mengisi seluruh lebar layar */
+        }
+
+        /* Sidebar untuk daftar pengguna */
+        .sidebar {
+            width: 250px;
+            background-color: #075e54;
+            color: #fff;
+            padding: 16px;
+            overflow-y: auto;
+        }
+        .sidebar h2 {
+            margin: 0 0 16px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .user-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .user-list li {
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 4px;
+        }
+        .user-list li:hover {
+            background-color: #128c7e;
+        }
+
+        /* Container untuk chat */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+        }
+
+        /* Header chat */
+        .chat-header {
+            background-color: #075e54;
+            color: #fff;
+            padding: 16px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        /* Area pesan */
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            background-color: #ece5dd;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Bubble chat */
+        .message {
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 70%;
+            position: relative;
+        }
+        .message.sent {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+        }
+        .message.received {
+            background-color: #fff;
+            align-self: flex-start;
+        }
+        .message-time {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        /* Input pesan */
+        .chat-input {
+            display: flex;
+            padding: 8px;
+            background-color: #f0f2f5;
+            border-top: 1px solid #ddd;
+        }
+        .chat-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+        .chat-input button {
+            background-color: #075e54;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-left: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar untuk daftar pengguna -->
+        <div class="sidebar">
+            <h2>Daftar Online</h2>
+            <ul class="user-list" id="user-list"></ul>
+        </div>
+
+        <!-- Container untuk chat -->
+        <div class="chat-container">
+            <div class="chat-header">Room</div>
+            <div class="chat-messages" id="messages"></div>
+            <div class="chat-input">
+                <input id="message-input" autocomplete="off" placeholder="Type a message..." />
+                <button id="send-button">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const userId = prompt("Enter your user ID:"); // Get user ID
+        let recipientId = null; // Recipient ID akan dipilih dari daftar pengguna
+
+        // Join private room
+        socket.emit('join private room', userId);
+
+        const messages = document.getElementById('messages');
+        const input = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const userList = document.getElementById('user-list');
+
+        // Function to add a message to the chat
+        function addMessage(message, isSent) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.classList.add(isSent ? 'sent' : 'received');
+            messageElement.textContent = message;
+
+            const timeElement = document.createElement('div');
+            timeElement.classList.add('message-time');
+            const now = new Date();
+            timeElement.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            messageElement.appendChild(timeElement);
+            messages.appendChild(messageElement);
+            messages.scrollTop = messages.scrollHeight; // Auto-scroll to the latest message
+        }
+
+        // Update daftar pengguna online
+        socket.on('update user list', (users) => {
+            userList.innerHTML = ''; // Kosongkan daftar
+            users.forEach(user => {
+                const userItem = document.createElement('li');
+                userItem.textContent = user;
+                userItem.addEventListener('click', () => {
+                    recipientId = user; // Pilih penerima
+                    alert(`You are now chatting with ${recipientId}`);
+                });
+                userList.appendChild(userItem);
+            });
+        });
+
+        // Send message
+        sendButton.addEventListener('click', () => {
+            const message = input.value.trim();
+            if (message && recipientId) {
+                socket.emit('private message', { recipientId, message });
+                addMessage(message, true); // Add sent message to the chat
+                input.value = '';
+            } else {
+                alert("Please select a recipient first!");
+            }
+        });
+
+        // Receive private message
+        socket.on('private message', ({ senderId, message }) => {
+            addMessage(message, false); // Add received message to the chat
+        });
+    </script>
+</body>
+</html>
